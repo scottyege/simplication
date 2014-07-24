@@ -59,6 +59,8 @@ public:
             hv->coordinate[1] = m->vertices[idx + 1];
             hv->coordinate[2] = m->vertices[idx + 2];
 
+            hv->heEdge = NULL;
+
             vertices.insert(make_pair(i + 1, hv));
         }
         ////
@@ -99,6 +101,12 @@ public:
 
                     halfEdges.insert(make_pair(make_pair(u, v), he));
                     hes[j] = he;
+
+                    if(vertices.find(u)->second->heEdge == NULL)
+                    {
+                        //if the vertex u has not associated to a half edge
+                        vertices.find(u)->second->heEdge = he;
+                    }
                 }
 
                 //assigne next half edge for each half edge in face F
@@ -126,8 +134,21 @@ public:
 
             if(halfEdges.find(inverse_e) != halfEdges.end())
             {
+                //a paired half edge is found
                 halfEdges[inverse_e]->paired_edge = halfEdges[e];
                 halfEdges[e]->paired_edge = halfEdges[inverse_e];
+            }
+            else
+            {
+                /*if a paired half edge is not found, it is a boundadry edge*/
+                HalfEdge *hee = new HalfEdge();
+                hee->left_face = NULL;
+                hee->paired_edge = halfEdges[e];
+                hee->vertex_begin = vertices[e.second];
+                hee->next_edge = NULL;
+
+                halfEdges[e]->paired_edge = hee;
+                halfEdges.insert(make_pair(make_pair(inverse_e.first, inverse_e.second), hee));
             }
 
             citer++;

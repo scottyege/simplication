@@ -68,6 +68,7 @@ public:
             ptr += 3;
         }
 
+		/*
         //texture coordinates
         ptr = &glmModel->texcoords[2];
         for(int i = 0; i < glmModel->numtexcoords; i++)
@@ -101,6 +102,7 @@ public:
                 vert_texcoord[vIdx] = texcoords[tIdx];
             }
         }
+		*/
     }
 
     void calCenterPos()

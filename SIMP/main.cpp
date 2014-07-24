@@ -69,12 +69,19 @@ struct ShaderUniformLoc
     GLuint fcolor;
 } uniformLoc;
 
-map< pair<GLuint, GLuint>, HalfEdge* >::const_iterator highlight;
+HalfEdge* highlight;
+HalfEdge* currentHE;
+map<GLuint, HEVertex*>::const_iterator currentVertex;
+bool nextOne = false;
+map<GLuint, HEVertex*>::const_iterator vhighlight;
+
+char filename[] = "teapot2.obj";
 
 void calCameraSet()
 {
     cameraProp.up = glm::vec3(0.0f, 1.0f, 0.0f);
-    cameraProp.at = xdModel->center;
+    //cameraProp.at = xdModel->center;
+	cameraProp.at = glm::vec3(0.0f, 0.0f, 0.0f);;
 
     cameraProp.fov = 30.0f;
 
@@ -94,9 +101,11 @@ Returns 1 when all is ok, 0 with a displayed error
 int init_resources(void)
 {
     //loading model
-    xdModel = new xDModel("teapot2.obj");
+    xdModel = new xDModel(filename);
     halfMesh = new HalfMesh(xdModel->glmModel);
-	highlight = halfMesh->halfEdges.begin();
+	currentHE = highlight = halfMesh->halfEdges.begin()->second;
+	currentVertex = halfMesh->vertices.begin();
+    vhighlight = halfMesh->vertices.begin();
     //
     //setting shader
     GLint link_ok = GL_FALSE;
@@ -165,31 +174,8 @@ void onDisplay()
     glUniformMatrix4fv(uniformLoc.modelMatrix, 1, GL_FALSE, glm::value_ptr(teapotMatrix * moveToCenter));
     glUniformMatrix4fv(uniformLoc.viewMatrix, 1, GL_FALSE, glm::value_ptr(viewMatrix));
     glUniformMatrix4fv(uniformLoc.projMatrix, 1, GL_FALSE, glm::value_ptr(projectionMatrix));
-    /*
-    GLMmodel *m = xdModel->glmModel;
 
-    //draw the big teapot
-    glBegin(GL_TRIANGLES);
-    GLMgroup *gg = m->groups;
-    while(gg != NULL)
-    {
-        for(int i = 0; i < gg->numtriangles; i++)
-        {
-            GLuint triIdx = gg->triangles[i];
-            for(int j = 0; j < 3; j++)
-            {
-                GLuint vIdx = m->triangles[triIdx].vindices[j] * 3;
-                GLuint nIdx = m->triangles[triIdx].nindices[j] * 3;
-                GLuint tIdx = m->triangles[triIdx].tindices[j] * 2;
-
-                glVertexAttrib3fv(attriLoc.vObjPos, &m->vertices[vIdx]);
-            }
-        }
-        gg = gg->next;
-    }
-    glEnd();
-    */
-	glUniform4fv(uniformLoc.fcolor, 1, glm::value_ptr(glm::vec4(1.0f)));
+    glUniform4fv(uniformLoc.fcolor, 1, glm::value_ptr(glm::vec4(1.0f)));
     glBegin(GL_TRIANGLES);
     map<GLuint, HEFace*>::const_iterator citer = halfMesh->heFaces.begin();
     HEFace *hf = NULL;
@@ -199,18 +185,32 @@ void onDisplay()
         glVertexAttrib3fv(attriLoc.vObjPos, hf->heEdge->vertex_begin->coordinate);
         glVertexAttrib3fv(attriLoc.vObjPos, hf->heEdge->next_edge->vertex_begin->coordinate);
         glVertexAttrib3fv(attriLoc.vObjPos, hf->heEdge->next_edge->next_edge->vertex_begin->coordinate);
-
         citer++;
     }
     glEnd();
 
-	glLineWidth(5);
-	glUniform4fv(uniformLoc.fcolor, 1, glm::value_ptr(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)));
-	glBegin(GL_LINES);
-		glVertexAttrib3fv(attriLoc.vObjPos, halfMesh->vertices[highlight->first.first]->coordinate);
-		glVertexAttrib3fv(attriLoc.vObjPos, halfMesh->vertices[highlight->first.second]->coordinate);
-	glEnd();
-	glLineWidth(1);
+    glLineWidth(5.0f);
+	if(!nextOne)
+		glUniform4fv(uniformLoc.fcolor, 1, glm::value_ptr(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)));
+	else
+		glUniform4fv(uniformLoc.fcolor, 1, glm::value_ptr(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)));
+
+    glBegin(GL_LINES);
+		glVertexAttrib3fv(attriLoc.vObjPos, highlight->vertex_begin->coordinate);
+		glVertexAttrib3fv(attriLoc.vObjPos, highlight->paired_edge->vertex_begin->coordinate);
+		//glVertexAttrib3fv(attriLoc.vObjPos, vhighlight->second->coordinate);
+		//glVertexAttrib3fv(attriLoc.vObjPos, vhighlight->second->heEdge->paired_edge->vertex_begin->coordinate);
+    glEnd();
+    glLineWidth(1.0f);
+
+    glPointSize(10.0f);
+    glUniform4fv(uniformLoc.fcolor, 1, glm::value_ptr(glm::vec4(1.0f, 1.0f, 0.0f, 1.0f)));
+    glBegin(GL_POINTS);
+		//glVertexAttrib3fv(attriLoc.vObjPos, vhighlight->second->coordinate);
+		glVertexAttrib3fv(attriLoc.vObjPos, highlight->vertex_begin->coordinate);
+    glEnd();
+    glPointSize(1.0f);
+
 
     glDisableVertexAttribArray(attriLoc.vObjPos);
 
@@ -333,13 +333,35 @@ void MyKeyboardFunc(unsigned char c, int x, int y)
         if(cameraProp.fov <= 80)
             cameraProp.fov += 5;
     }
-	else if(c == 'w')
+    else if(c == 'w')
+    {
+        //highlight++;
+        vhighlight++;
+    }
+    else if(c == 's')
+    {
+        //highlight--;
+        vhighlight--;
+    }
+    else if(c == 'e')
+    {
+		if(!nextOne)
+			highlight = highlight->paired_edge;
+		else
+			highlight = highlight->next_edge;
+
+		nextOne = !nextOne;
+
+		if(highlight == currentHE)
+		{ //finish traversal every halfedge attached to vertex v
+			currentVertex++;
+			currentHE = highlight = currentVertex->second->heEdge;
+			nextOne = false;
+		}	
+    }
+	else if(c == 'c')
 	{
-		highlight++;
-	}
-	else if(c == 's')
-	{
-		highlight--;
+		printf("%f, %f, %f\n", xdModel->center[0], xdModel->center[1], xdModel->center[2]);
 	}
 }
 
