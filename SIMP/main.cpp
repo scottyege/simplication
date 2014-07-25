@@ -75,13 +75,21 @@ map<GLuint, HEVertex*>::const_iterator currentVertex;
 bool nextOne = false;
 map<GLuint, HEVertex*>::const_iterator vhighlight;
 
-char filename[] = "teapot2.obj";
+char filename[] = "gourd.obj";
+/*
+cube
+gourd
+sphere
+teapot
+teapot2
+tetrahedron
+*/
 
 void calCameraSet()
 {
     cameraProp.up = glm::vec3(0.0f, 1.0f, 0.0f);
     //cameraProp.at = xdModel->center;
-	cameraProp.at = glm::vec3(0.0f, 0.0f, 0.0f);;
+    cameraProp.at = glm::vec3(0.0f, 0.0f, 0.0f);;
 
     cameraProp.fov = 30.0f;
 
@@ -103,8 +111,8 @@ int init_resources(void)
     //loading model
     xdModel = new xDModel(filename);
     halfMesh = new HalfMesh(xdModel->glmModel);
-	currentHE = highlight = halfMesh->halfEdges.begin()->second;
-	currentVertex = halfMesh->vertices.begin();
+    currentHE = highlight = halfMesh->halfEdges.begin()->second;
+    currentVertex = halfMesh->vertices.begin();
     vhighlight = halfMesh->vertices.begin();
     //
     //setting shader
@@ -190,24 +198,24 @@ void onDisplay()
     glEnd();
 
     glLineWidth(5.0f);
-	if(!nextOne)
-		glUniform4fv(uniformLoc.fcolor, 1, glm::value_ptr(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)));
-	else
-		glUniform4fv(uniformLoc.fcolor, 1, glm::value_ptr(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)));
+    if(!nextOne)
+        glUniform4fv(uniformLoc.fcolor, 1, glm::value_ptr(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)));
+    else
+        glUniform4fv(uniformLoc.fcolor, 1, glm::value_ptr(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)));
 
     glBegin(GL_LINES);
-		glVertexAttrib3fv(attriLoc.vObjPos, highlight->vertex_begin->coordinate);
-		glVertexAttrib3fv(attriLoc.vObjPos, highlight->paired_edge->vertex_begin->coordinate);
-		//glVertexAttrib3fv(attriLoc.vObjPos, vhighlight->second->coordinate);
-		//glVertexAttrib3fv(attriLoc.vObjPos, vhighlight->second->heEdge->paired_edge->vertex_begin->coordinate);
+    glVertexAttrib3fv(attriLoc.vObjPos, highlight->vertex_begin->coordinate);
+    glVertexAttrib3fv(attriLoc.vObjPos, highlight->paired_edge->vertex_begin->coordinate);
+    //glVertexAttrib3fv(attriLoc.vObjPos, vhighlight->second->coordinate);
+    //glVertexAttrib3fv(attriLoc.vObjPos, vhighlight->second->heEdge->paired_edge->vertex_begin->coordinate);
     glEnd();
     glLineWidth(1.0f);
 
     glPointSize(10.0f);
     glUniform4fv(uniformLoc.fcolor, 1, glm::value_ptr(glm::vec4(1.0f, 1.0f, 0.0f, 1.0f)));
     glBegin(GL_POINTS);
-		//glVertexAttrib3fv(attriLoc.vObjPos, vhighlight->second->coordinate);
-		glVertexAttrib3fv(attriLoc.vObjPos, highlight->vertex_begin->coordinate);
+    //glVertexAttrib3fv(attriLoc.vObjPos, vhighlight->second->coordinate);
+    glVertexAttrib3fv(attriLoc.vObjPos, highlight->vertex_begin->coordinate);
     glEnd();
     glPointSize(1.0f);
 
@@ -345,24 +353,43 @@ void MyKeyboardFunc(unsigned char c, int x, int y)
     }
     else if(c == 'e')
     {
-		if(!nextOne)
-			highlight = highlight->paired_edge;
-		else
-			highlight = highlight->next_edge;
+        if(!nextOne)
+        {
+            if(highlight->paired_edge->next_edge)//it is not a boudary edge
+            {
+                highlight = highlight->paired_edge;
+                nextOne = !nextOne;
+            }
+            else
+            {
+                highlight = highlight->next_edge;
+                nextOne = false;
+            }
+        }
+        else
+        {
+            highlight = highlight->next_edge;
+            nextOne = !nextOne;
+        }
 
-		nextOne = !nextOne;
+        if(highlight == currentHE)
+        {
+            //finish traversal every halfedge attached to vertex v
+            currentVertex++;
+			if(currentVertex == halfMesh->vertices.end())
+			{	
+				printf("motherfucker, reset\n");
+				currentVertex = halfMesh->vertices.begin();
+			}
 
-		if(highlight == currentHE)
-		{ //finish traversal every halfedge attached to vertex v
-			currentVertex++;
-			currentHE = highlight = currentVertex->second->heEdge;
-			nextOne = false;
-		}	
+            currentHE = highlight = currentVertex->second->heEdge;
+            nextOne = false;
+        }
     }
-	else if(c == 'c')
-	{
-		printf("%f, %f, %f\n", xdModel->center[0], xdModel->center[1], xdModel->center[2]);
-	}
+    else if(c == 'c')
+    {
+        printf("%f, %f, %f\n", xdModel->center[0], xdModel->center[1], xdModel->center[2]);
+    }
 }
 
 int main(int argc, char* argv[])
