@@ -11,6 +11,9 @@ using std::map;
 using std::pair;
 using std::make_pair;
 
+#include<queue>
+using std::queue;
+
 struct HEVertex;
 struct HEFace;
 
@@ -155,6 +158,33 @@ public:
         }
         ////
         ////
+    }
+
+    void edgeCollapse(GLuint u, GLuint v)
+    {
+        pair<GLuint, GLuint> uv(u, v);
+        pair<GLuint, GLuint> vu(v, u);
+
+        queue<HalfEdge*> processQ;
+        HalfEdge *he;
+
+        //add all half edges starting from u
+        processQ.push(halfEdges[uv]);
+        he = halfEdges[uv]->paired_edge->next_edge;
+        while(he != halfEdges[uv])
+        {
+            processQ.push(he);
+            he = he->paired_edge->next_edge;
+        }
+
+        //add all half edges starting from v
+        processQ.push(halfEdges[vu]);
+        he = halfEdges[vu]->paired_edge->next_edge;
+        while(he != halfEdges[vu])
+        {
+            processQ.push(he);
+            he = he->paired_edge->next_edge;
+        }
     }
 
 private:
