@@ -75,7 +75,7 @@ map<GLuint, HEVertex*>::const_iterator currentVertex;
 bool nextOne = false;
 map<GLuint, HEVertex*>::const_iterator vhighlight;
 
-char filename[] = "gourd.obj";
+char filename[] = "sphere.obj";
 /*
 cube
 gourd
@@ -190,12 +190,17 @@ void onDisplay()
     while(citer != halfMesh->heFaces.end())
     {
         hf = citer->second;
-        glVertexAttrib3fv(attriLoc.vObjPos, hf->heEdge->vertex_begin->coordinate);
-        glVertexAttrib3fv(attriLoc.vObjPos, hf->heEdge->next_edge->vertex_begin->coordinate);
-        glVertexAttrib3fv(attriLoc.vObjPos, hf->heEdge->next_edge->next_edge->vertex_begin->coordinate);
+        if(hf->heEdge)
+        {
+            glVertexAttrib3fv(attriLoc.vObjPos, hf->heEdge->vertex_begin->coordinate);
+            glVertexAttrib3fv(attriLoc.vObjPos, hf->heEdge->next_edge->vertex_begin->coordinate);
+            glVertexAttrib3fv(attriLoc.vObjPos, hf->heEdge->next_edge->next_edge->vertex_begin->coordinate);
+        }
         citer++;
     }
     glEnd();
+
+	/*
 
     glLineWidth(5.0f);
     if(!nextOne)
@@ -203,6 +208,7 @@ void onDisplay()
     else
         glUniform4fv(uniformLoc.fcolor, 1, glm::value_ptr(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)));
 
+	
     glBegin(GL_LINES);
     glVertexAttrib3fv(attriLoc.vObjPos, highlight->vertex_begin->coordinate);
     glVertexAttrib3fv(attriLoc.vObjPos, highlight->paired_edge->vertex_begin->coordinate);
@@ -218,7 +224,7 @@ void onDisplay()
     glVertexAttrib3fv(attriLoc.vObjPos, highlight->vertex_begin->coordinate);
     glEnd();
     glPointSize(1.0f);
-
+	*/
 
     glDisableVertexAttribArray(attriLoc.vObjPos);
 
@@ -376,11 +382,11 @@ void MyKeyboardFunc(unsigned char c, int x, int y)
         {
             //finish traversal every halfedge attached to vertex v
             currentVertex++;
-			if(currentVertex == halfMesh->vertices.end())
-			{	
-				printf("motherfucker, reset\n");
-				currentVertex = halfMesh->vertices.begin();
-			}
+            if(currentVertex == halfMesh->vertices.end())
+            {
+                printf("motherfucker, reset\n");
+                currentVertex = halfMesh->vertices.begin();
+            }
 
             currentHE = highlight = currentVertex->second->heEdge;
             nextOne = false;
@@ -390,6 +396,10 @@ void MyKeyboardFunc(unsigned char c, int x, int y)
     {
         printf("%f, %f, %f\n", xdModel->center[0], xdModel->center[1], xdModel->center[2]);
     }
+	else if(c == 'p')
+	{
+		halfMesh->randomCollapse();
+	}
 }
 
 int main(int argc, char* argv[])
