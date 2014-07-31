@@ -27,8 +27,6 @@ using std::cout;
 #include "HalfMesh.h"
 
 /* ADD GLOBAL VARIABLES HERE LATER */
-GLuint texture_id;
-GLuint texture_id_2;
 GLuint program;
 
 xDModel *xdModel = NULL;
@@ -44,7 +42,8 @@ struct FPSCount
     int frame;
     int timebase;
     int time;
-} fpsCount = {0, 0, 0};
+    float fps;
+} fpsCount = {0, 0, 0, 0.0f};
 
 struct CameraProperty
 {
@@ -69,13 +68,7 @@ struct ShaderUniformLoc
     GLuint fcolor;
 } uniformLoc;
 
-HalfEdge* highlight;
-HalfEdge* currentHE;
-map<GLuint, HEVertex*>::const_iterator currentVertex;
-bool nextOne = false;
-map<GLuint, HEVertex*>::const_iterator vhighlight;
-
-char filename[] = "sphere.obj";
+char filename[] = "gourd.obj";
 /*
 cube
 gourd
@@ -85,10 +78,21 @@ teapot2
 tetrahedron
 */
 
+void print_bitmap_string(void* font, char* s)
+{
+    if (s && strlen(s))
+    {
+        while (*s)
+        {
+            glutBitmapCharacter(font, *s);
+            s++;
+        }
+    }
+}
+
 void calCameraSet()
 {
     cameraProp.up = glm::vec3(0.0f, 1.0f, 0.0f);
-    //cameraProp.at = xdModel->center;
     cameraProp.at = glm::vec3(0.0f, 0.0f, 0.0f);;
 
     cameraProp.fov = 30.0f;
@@ -111,9 +115,7 @@ int init_resources(void)
     //loading model
     xdModel = new xDModel(filename);
     halfMesh = new HalfMesh(xdModel->glmModel);
-    currentHE = highlight = halfMesh->halfEdges.begin()->second;
-    currentVertex = halfMesh->vertices.begin();
-    vhighlight = halfMesh->vertices.begin();
+
     //
     //setting shader
     GLint link_ok = GL_FALSE;
@@ -200,36 +202,23 @@ void onDisplay()
     }
     glEnd();
 
-	/*
-
-    glLineWidth(5.0f);
-    if(!nextOne)
-        glUniform4fv(uniformLoc.fcolor, 1, glm::value_ptr(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)));
-    else
-        glUniform4fv(uniformLoc.fcolor, 1, glm::value_ptr(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)));
-
-	
-    glBegin(GL_LINES);
-    glVertexAttrib3fv(attriLoc.vObjPos, highlight->vertex_begin->coordinate);
-    glVertexAttrib3fv(attriLoc.vObjPos, highlight->paired_edge->vertex_begin->coordinate);
-    //glVertexAttrib3fv(attriLoc.vObjPos, vhighlight->second->coordinate);
-    //glVertexAttrib3fv(attriLoc.vObjPos, vhighlight->second->heEdge->paired_edge->vertex_begin->coordinate);
-    glEnd();
-    glLineWidth(1.0f);
-
-    glPointSize(10.0f);
-    glUniform4fv(uniformLoc.fcolor, 1, glm::value_ptr(glm::vec4(1.0f, 1.0f, 0.0f, 1.0f)));
-    glBegin(GL_POINTS);
-    //glVertexAttrib3fv(attriLoc.vObjPos, vhighlight->second->coordinate);
-    glVertexAttrib3fv(attriLoc.vObjPos, highlight->vertex_begin->coordinate);
-    glEnd();
-    glPointSize(1.0f);
-	*/
-
     glDisableVertexAttribArray(attriLoc.vObjPos);
 
     glUseProgram(0);
 
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluOrtho2D(-400, 400, -300, 300);
+
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    glRasterPos2f(-400.0f, 280.0f);
+    char aa[100];
+    sprintf(aa, "fps: %.2f", fpsCount.fps);
+
+    glColor4f(0.0, 1.0, 0.0, 0.0);
+    print_bitmap_string(GLUT_BITMAP_TIMES_ROMAN_24, aa);
 
     /* Display the result */
     glutSwapBuffers();
@@ -280,10 +269,10 @@ void onIdle()
 
     if (fpsCount.time - fpsCount.timebase > 1000)
     {
-        double fps = fpsCount.frame * 1000.0 / (fpsCount.time - fpsCount.timebase);
+        fpsCount.fps = fpsCount.frame * 1000.0 / (fpsCount.time - fpsCount.timebase);
         fpsCount.timebase = fpsCount.time;
         fpsCount.frame = 0;
-        printf("fps: %f\n", fps);
+        //printf("fps: %f\n", fps);
     }
 
 
@@ -347,59 +336,14 @@ void MyKeyboardFunc(unsigned char c, int x, int y)
         if(cameraProp.fov <= 80)
             cameraProp.fov += 5;
     }
-    else if(c == 'w')
-    {
-        //highlight++;
-        vhighlight++;
-    }
-    else if(c == 's')
-    {
-        //highlight--;
-        vhighlight--;
-    }
-    else if(c == 'e')
-    {
-        if(!nextOne)
-        {
-            if(highlight->paired_edge->next_edge)//it is not a boudary edge
-            {
-                highlight = highlight->paired_edge;
-                nextOne = !nextOne;
-            }
-            else
-            {
-                highlight = highlight->next_edge;
-                nextOne = false;
-            }
-        }
-        else
-        {
-            highlight = highlight->next_edge;
-            nextOne = !nextOne;
-        }
-
-        if(highlight == currentHE)
-        {
-            //finish traversal every halfedge attached to vertex v
-            currentVertex++;
-            if(currentVertex == halfMesh->vertices.end())
-            {
-                printf("motherfucker, reset\n");
-                currentVertex = halfMesh->vertices.begin();
-            }
-
-            currentHE = highlight = currentVertex->second->heEdge;
-            nextOne = false;
-        }
-    }
     else if(c == 'c')
     {
         printf("%f, %f, %f\n", xdModel->center[0], xdModel->center[1], xdModel->center[2]);
     }
-	else if(c == 'p')
-	{
-		halfMesh->randomCollapse();
-	}
+    else if(c == ' ')
+    {
+        halfMesh->randomCollapse();
+    }
 }
 
 int main(int argc, char* argv[])
@@ -409,6 +353,7 @@ int main(int argc, char* argv[])
     glutInitContextVersion(2,0);
     glutInitDisplayMode(GLUT_RGBA|GLUT_DOUBLE|GLUT_DEPTH|GLUT_ALPHA);
     glutInitWindowSize(screen_width, screen_height);
+    glutInitWindowPosition(800, 400);
     glutCreateWindow("ZZZZZZZZ");
 
     /* Extension wrangler initialising */

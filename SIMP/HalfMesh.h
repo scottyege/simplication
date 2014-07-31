@@ -211,7 +211,8 @@ public:
         while(iter != halfEdges.end())
         {
             mc.he = iter->second;
-            if(mc.he->left_face && mc.he->next_edge->left_face && mc.he->next_edge->next_edge->left_face) //exclude the boundary edge
+            if(mc.he->left_face && 
+				mc.he->next_edge->left_face && mc.he->next_edge->next_edge->left_face) //exclude the boundary edge
             {
                 mc.length = HEMetric::edgeDistance(vertices[iter->first.first]->coordinate, vertices[iter->first.second]->coordinate);
                 cc.push_back(mc);
