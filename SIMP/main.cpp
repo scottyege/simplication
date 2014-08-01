@@ -192,7 +192,7 @@ void onDisplay()
     while(citer != halfMesh->heFaces.end())
     {
         hf = citer->second;
-        if(hf->heEdge)
+		if(hf->heEdge && !hf->isBoundaryFace)
         {
             glVertexAttrib3fv(attriLoc.vObjPos, hf->heEdge->vertex_begin->coordinate);
             glVertexAttrib3fv(attriLoc.vObjPos, hf->heEdge->next_edge->vertex_begin->coordinate);

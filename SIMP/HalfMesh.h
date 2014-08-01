@@ -65,6 +65,7 @@ struct HEVertex
 struct HEFace
 {
     HalfEdge* heEdge;
+    bool isBoundaryFace;
 };
 
 class HalfMesh
@@ -198,6 +199,19 @@ public:
                 printf("GGGGGGGGGGGGGGGG\n");
             citer++;
         }
+
+        map<GLuint, HEFace*>::iterator ic = heFaces.begin();
+        while(ic != heFaces.end())
+        {
+            if(!ic->second->heEdge->paired_edge->left_face
+                    || !ic->second->heEdge->next_edge->paired_edge->left_face
+                    || !ic->second->heEdge->next_edge->next_edge->paired_edge->left_face)
+                ic->second->isBoundaryFace = true;
+            else
+                ic->second->isBoundaryFace = false;
+
+            ic++;
+        }
     }
 
     void randomCollapse()
@@ -211,8 +225,7 @@ public:
         while(iter != halfEdges.end())
         {
             mc.he = iter->second;
-            if(mc.he->left_face && 
-				mc.he->next_edge->left_face && mc.he->next_edge->next_edge->left_face) //exclude the boundary edge
+            if(iter->second->left_face && !iter->second->left_face->isBoundaryFace) //exclude the boundary edge
             {
                 mc.length = HEMetric::edgeDistance(vertices[iter->first.first]->coordinate, vertices[iter->first.second]->coordinate);
                 cc.push_back(mc);
@@ -246,7 +259,7 @@ public:
         pair<GLuint, GLuint> uv(u, v);
         pair<GLuint, GLuint> vu(v, u);
 
-        //calculate new vertex position
+        ////calculate new vertex position
         Point3D mid =
         {
             (vertices[u]->coordinate[0] + vertices[v]->coordinate[0]) / 2.0f,
@@ -259,101 +272,91 @@ public:
         hv_mid->coordinate[2] = mid[2];
         GLuint hv_mid_id = vertices.size() + 1;
         hv_mid->id = hv_mid_id;
-        hv_mid->heEdge = vertices[v]->heEdge;
+        hv_mid->heEdge = halfEdges[uv]->next_edge->next_edge->paired_edge;
         vertices.insert(make_pair(hv_mid_id, hv_mid));
+        ////
+
+        //will paring he11-he12, he21-he22
+
+        HalfEdge *he11 = halfEdges[uv]->next_edge->paired_edge;
+        HalfEdge *he12 = halfEdges[uv]->next_edge->next_edge->paired_edge;
+        HalfEdge *he21 = halfEdges[vu]->next_edge->paired_edge;
+        HalfEdge *he22 = halfEdges[vu]->next_edge->next_edge->paired_edge;
 
         HEFace *face1 = halfEdges[uv]->left_face;
         HEFace *face2 = halfEdges[vu]->left_face;
 
-        vector< pair< pair<GLuint, GLuint>, HalfEdge* > > adjEdges;
+        vector< pair< pair<GLuint, GLuint>, HalfEdge* > > candidates;
+        //start from u
         HalfEdge *he = halfEdges[uv]->paired_edge->next_edge;
-
-        adjEdges.push_back(make_pair(make_pair(u, v), halfEdges[uv]));
-        adjEdges.push_back(make_pair(make_pair(v, u), halfEdges[vu]));
-        while(he != halfEdges[uv])
+        do
         {
-            pair<GLuint, GLuint> pq(u, he->paired_edge->vertex_begin->id);
-            pair<GLuint, GLuint> qp(pq.second, pq.first);
-
-            adjEdges.push_back(make_pair(pq, he));
-            adjEdges.push_back(make_pair(qp, he->paired_edge));
-
-            halfEdges.erase(pq);
-            halfEdges.erase(qp);
+            candidates.push_back(make_pair(make_pair(he->vertex_begin->id, he->paired_edge->vertex_begin->id), he));
+            candidates.push_back(make_pair(make_pair(he->paired_edge->vertex_begin->id, he->vertex_begin->id), he->paired_edge));
 
             he = he->paired_edge->next_edge;
         }
+        while(he != halfEdges[uv]);
 
+        //start from v
         he = halfEdges[vu]->paired_edge->next_edge;
-        while(he != halfEdges[vu])
+        do
         {
-            pair<GLuint, GLuint> pq(v, he->paired_edge->vertex_begin->id);
-            pair<GLuint, GLuint> qp(pq.second, pq.first);
-
-            adjEdges.push_back(make_pair(pq, he));
-            adjEdges.push_back(make_pair(qp, he->paired_edge));
-
-            halfEdges.erase(pq);
-            halfEdges.erase(qp);
+            candidates.push_back(make_pair(make_pair(he->vertex_begin->id, he->paired_edge->vertex_begin->id), he));
+            candidates.push_back(make_pair(make_pair(he->paired_edge->vertex_begin->id, he->vertex_begin->id), he->paired_edge));
 
             he = he->paired_edge->next_edge;
         }
+        while(he != halfEdges[vu]);
 
-        for(int i = 0; i < adjEdges.size(); i++)
-        {
-            if(adjEdges[i].first.first == u || adjEdges[i].first.first == v)
-            {
-                adjEdges[i].first.first = hv_mid_id;
-                adjEdges[i].second->vertex_begin = hv_mid;
-            }
-            else if(adjEdges[i].first.second == u || adjEdges[i].first.second == v)
-            {
-                adjEdges[i].first.second = hv_mid_id;
-            }
-        }
+        halfEdges.erase(uv);
+        halfEdges.erase(vu);
 
-        for(int i = 0; i < adjEdges.size(); i++)
+        for(int i = 0; i < candidates.size(); i++)
         {
-            if(adjEdges[i].second->left_face == face1 || adjEdges[i].second->left_face == face2)
-            {
-                adjEdges[i].second = NULL;
-            }
-        }
+            pair<GLuint, GLuint> &pq = candidates[i].first;
 
-        for(int i = 0; i < adjEdges.size(); i++)
-        {
-            if(!adjEdges[i].second)
+            halfEdges.erase(pq);
+
+            if(candidates[i].second == he12->paired_edge
+                    || candidates[i].second == he21->paired_edge
+                    || candidates[i].second == he11->paired_edge
+                    || candidates[i].second == he22->paired_edge
+              )
+            {
+                candidates[i].second = NULL;
                 continue;
+            }
 
-            for(int j = 0; j < adjEdges.size(); j++)
+            HalfEdge *he = candidates[i].second;
+
+            if(pq.first == u || pq.first == v)
             {
-
-                if(!adjEdges[j].second)
-                    continue;
-
-                //paring the half edge will repeat, but the result is not affected
-                if(adjEdges[i].first.first == adjEdges[j].first.second
-                        && adjEdges[i].first.second == adjEdges[j].first.first)
-                {
-                    adjEdges[i].second->paired_edge = adjEdges[j].second;
-                    adjEdges[j].second->paired_edge = adjEdges[i].second;
-                    break;
-                }
+                pq.first = hv_mid_id;
+                he->vertex_begin = hv_mid;
+            }
+            else if(pq.second == u || pq.second == v)
+            {
+                pq.second = hv_mid_id;
             }
         }
 
-        for(int i = 0; i < adjEdges.size(); i++)
+        //pareing outer halfedges
+        he11->paired_edge = he12;
+        he12->paired_edge = he11;
+        he21->paired_edge = he22;
+        he22->paired_edge = he21;
+
+        //add what should be add
+        for(int i = 0; i < candidates.size(); i++)
         {
-            if(adjEdges[i].second)
-                halfEdges.insert(adjEdges[i]);
+            if(candidates[i].second)
+                halfEdges.insert(candidates[i]);
         }
 
         face1->heEdge = NULL;
         face2->heEdge = NULL;
     }
-
-private:
-
 };
 
 #endif
