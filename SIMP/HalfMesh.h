@@ -78,6 +78,7 @@ public:
 
     map<GLuint, HEFace*> heFaces;
 
+    GLuint nextNewIdCount;
 
     HalfMesh(GLMmodel *m)
     {
@@ -212,6 +213,8 @@ public:
 
             ic++;
         }
+
+        nextNewIdCount = vertices.size() + 2;
     }
 
     void randomCollapse()
@@ -222,15 +225,42 @@ public:
         HEMetric mc;
         vector<HEMetric> cc;
 
+        vector< pair<GLuint, GLuint> > delList; //store the halfedge with invalid end vertex
         while(iter != halfEdges.end())
         {
             mc.he = iter->second;
             if(iter->second->left_face && !iter->second->left_face->isBoundaryFace) //exclude the boundary edge
             {
-                mc.length = HEMetric::edgeDistance(vertices[iter->first.first]->coordinate, vertices[iter->first.second]->coordinate);
-                cc.push_back(mc);
+                if(vertices.find(iter->first.first) != vertices.end() &&
+                        vertices.find(iter->first.second) != vertices.end())
+                {
+                    Point3D v1 =
+                    {
+                        vertices[iter->first.first]->coordinate[0],
+                        vertices[iter->first.first]->coordinate[1],
+                        vertices[iter->first.first]->coordinate[2],
+                    };
+                    Point3D v2 =
+                    {
+                        vertices[iter->first.second]->coordinate[0],
+                        vertices[iter->first.second]->coordinate[1],
+                        vertices[iter->first.second]->coordinate[2],
+                    };
+                    //mc.length = HEMetric::edgeDistance(vertices[iter->first.first]->coordinate, vertices[iter->first.second]->coordinate);
+                    mc.length = HEMetric::edgeDistance(v1, v2);
+                    cc.push_back(mc);
+                }
+                else
+                {
+                    delList.push_back(iter->first);
+                }
             }
             iter++;
+        }
+
+        for(int i = 0; i < delList.size(); i++)
+        {
+            halfEdges.erase(delList[i]);
         }
 
         vector<HEMetric>::iterator m = min_element(cc.begin(), cc.end(), mc);
@@ -270,7 +300,9 @@ public:
         hv_mid->coordinate[0] = mid[0];
         hv_mid->coordinate[1] = mid[1];
         hv_mid->coordinate[2] = mid[2];
-        GLuint hv_mid_id = vertices.size() + 1;
+        GLuint hv_mid_id = nextNewIdCount;
+        nextNewIdCount++;
+
         hv_mid->id = hv_mid_id;
         hv_mid->heEdge = halfEdges[uv]->next_edge->next_edge->paired_edge;
         vertices.insert(make_pair(hv_mid_id, hv_mid));
@@ -309,14 +341,14 @@ public:
         }
         while(he != halfEdges[vu]);
 
-        halfEdges.erase(uv);
-        halfEdges.erase(vu);
+        printf("%d", halfEdges.erase(uv));
+        printf("%d", halfEdges.erase(vu));
 
         for(int i = 0; i < candidates.size(); i++)
         {
             pair<GLuint, GLuint> &pq = candidates[i].first;
 
-            halfEdges.erase(pq);
+            printf("%d", halfEdges.erase(pq));
 
             if(candidates[i].second == he12->paired_edge
                     || candidates[i].second == he21->paired_edge
@@ -339,6 +371,10 @@ public:
             {
                 pq.second = hv_mid_id;
             }
+            else
+            {
+                printf("WTF?\n");
+            }
         }
 
         //pareing outer halfedges
@@ -356,6 +392,9 @@ public:
 
         face1->heEdge = NULL;
         face2->heEdge = NULL;
+
+        printf("%d", vertices.erase(u));
+        printf("%d",  vertices.erase(v));
     }
 };
 
