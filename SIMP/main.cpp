@@ -37,6 +37,8 @@ int screen_width = 800, screen_height = 600;
 int last_mx = 0, last_my = 0, cur_mx = 0, cur_my = 0;
 int arcball_on = false;
 
+bool gogoSim = false;
+
 struct FPSCount
 {
     int frame;
@@ -163,8 +165,6 @@ glm::mat4 teapotMatrix(1.0f);
 glm::mat4 viewMatrix;
 glm::mat4 projectionMatrix;
 
-
-
 void onDisplay()
 {
 
@@ -192,7 +192,7 @@ void onDisplay()
     while(citer != halfMesh->heFaces.end())
     {
         hf = citer->second;
-		if(hf->heEdge && !hf->isBoundaryFace)
+        if(hf->heEdge && !hf->isBoundaryFace)
         {
             glVertexAttrib3fv(attriLoc.vObjPos, hf->heEdge->vertex_begin->coordinate);
             glVertexAttrib3fv(attriLoc.vObjPos, hf->heEdge->next_edge->vertex_begin->coordinate);
@@ -275,6 +275,16 @@ void onIdle()
         //printf("fps: %f\n", fps);
     }
 
+    if (gogoSim && (fpsCount.time - fpsCount.timebase > 500))
+    {
+        halfMesh->randomCollapse();
+        if(halfMesh->heFaces.size() < 20)
+		{
+            gogoSim = false;
+			printf("Stop collaping edge!\n");
+		}
+    }
+
 
     moveToCenter = glm::translate(glm::mat4(1.0f), -xdModel->center);
 
@@ -342,7 +352,9 @@ void MyKeyboardFunc(unsigned char c, int x, int y)
     }
     else if(c == ' ')
     {
-        halfMesh->randomCollapse();
+        //halfMesh->randomCollapse();
+		printf("Start collaping edge!\n");
+        gogoSim = true;
     }
 }
 

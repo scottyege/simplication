@@ -53,6 +53,8 @@ struct HalfEdge
     HalfEdge* next_edge;
     HalfEdge* paired_edge;
     HEFace* left_face;
+
+    GLuint id;
 };
 
 struct HEVertex
@@ -64,6 +66,7 @@ struct HEVertex
 
 struct HEFace
 {
+    GLuint id;
     HalfEdge* heEdge;
     bool isBoundaryFace;
 };
@@ -107,6 +110,8 @@ public:
         GLMtriangle *mt = NULL;
         GLuint triangleIdx;
 
+        GLuint heIdx = 1;
+
         GLMgroup *gp = m->groups;
         while(gp)
         {
@@ -116,6 +121,7 @@ public:
                 mt = &m->triangles[triangleIdx];
 
                 hef = new HEFace();
+                hef->id = triangleIdx;
                 heFaces.insert(make_pair(triangleIdx, hef));
 
                 GLuint edges[][2] =
@@ -134,11 +140,13 @@ public:
                     he = new HalfEdge();
                     he->vertex_begin = vertices[u];
                     he->left_face = hef;
+                    he->id = heIdx;
+                    heIdx++;
 
                     halfEdges.insert(make_pair(make_pair(u, v), he));
                     hes[j] = he;
 
-                    if(vertices.find(u)->second->heEdge == NULL)
+                    if(!vertices.find(u)->second->heEdge)
                     {
                         //if the vertex u has not associated to a half edge
                         vertices.find(u)->second->heEdge = he;
@@ -225,7 +233,79 @@ public:
         HEMetric mc;
         vector<HEMetric> cc;
 
+        /*
+        preprocess
+        */
+        map< pair<GLuint, GLuint>, HalfEdge* > ee;
+        while(iter != halfEdges.end())
+        {
+            pair<GLuint, GLuint> pq = iter->first;
+            pair<GLuint, GLuint> qp(pq.second, pq.first);
+
+            if(ee.find(pq) == ee.end() && ee.find(qp) == ee.end())
+                ee.insert(*iter);
+
+            iter++;
+        }
+
+        iter = ee.begin();
         vector< pair<GLuint, GLuint> > delList; //store the halfedge with invalid end vertex
+        while(iter != ee.end())
+        {
+            mc.he = iter->second;
+
+            if(vertices.find(iter->first.first) != vertices.end() &&
+                    vertices.find(iter->first.second) != vertices.end())
+            {
+                Point3D v1 =
+                {
+                    vertices[iter->first.first]->coordinate[0],
+                    vertices[iter->first.first]->coordinate[1],
+                    vertices[iter->first.first]->coordinate[2],
+                };
+                Point3D v2 =
+                {
+                    vertices[iter->first.second]->coordinate[0],
+                    vertices[iter->first.second]->coordinate[1],
+                    vertices[iter->first.second]->coordinate[2],
+                };
+                //mc.length = HEMetric::edgeDistance(vertices[iter->first.first]->coordinate, vertices[iter->first.second]->coordinate);
+                mc.length = HEMetric::edgeDistance(v1, v2);
+                cc.push_back(mc);
+            }
+            else
+            {
+                delList.push_back(iter->first);
+            }
+
+            iter++;
+        }
+
+        for(int i = 0; i < delList.size(); i++)
+        {
+            halfEdges.erase(delList[i]);
+        }
+
+        vector<HEMetric>::iterator m = min_element(cc.begin(), cc.end(), mc);
+
+        GLuint u = m->he->vertex_begin->id;
+        GLuint v = m->he->paired_edge->vertex_begin->id;
+
+        while(halfEdges.find(make_pair(u, v)) == halfEdges.end())
+        {
+            printf("cannot find edge %u, %u, regenerate\n", u, v);
+            cc.erase(m);
+
+            m = min_element(cc.begin(), cc.end(), mc);
+            u = m->he->vertex_begin->id;
+            v = m->he->paired_edge->vertex_begin->id;
+        }
+
+        //printf("collapse! %u, %u, length: %f\n", u, v, m->length);
+
+        edgeCollapse(u, v);
+
+        /*vector< pair<GLuint, GLuint> > delList; //store the halfedge with invalid end vertex
         while(iter != halfEdges.end())
         {
             mc.he = iter->second;
@@ -281,11 +361,11 @@ public:
         printf("collapse! %u, %u, length: %f\n", u, v, m->length);
 
         edgeCollapse(u, v);
+        */
     }
 
     void edgeCollapse(GLuint u, GLuint v)
     {
-
         pair<GLuint, GLuint> uv(u, v);
         pair<GLuint, GLuint> vu(v, u);
 
@@ -341,19 +421,22 @@ public:
         }
         while(he != halfEdges[vu]);
 
-        printf("%d", halfEdges.erase(uv));
-        printf("%d", halfEdges.erase(vu));
+        halfEdges.erase(uv);
+        halfEdges.erase(vu);
+        //printf("erase uv: %d\n", halfEdges.erase(uv));
+        //printf("erase vu: %d\n", halfEdges.erase(vu));
 
         for(int i = 0; i < candidates.size(); i++)
         {
             pair<GLuint, GLuint> &pq = candidates[i].first;
 
-            printf("%d", halfEdges.erase(pq));
+            halfEdges.erase(pq);
+            //printf("erase candidates: %d\n", halfEdges.erase(pq));
 
-            if(candidates[i].second == he12->paired_edge
-                    || candidates[i].second == he21->paired_edge
-                    || candidates[i].second == he11->paired_edge
-                    || candidates[i].second == he22->paired_edge
+            if(candidates[i].second->id == he12->paired_edge->id
+                    || candidates[i].second->id == he21->paired_edge->id
+                    || candidates[i].second->id == he11->paired_edge->id
+                    || candidates[i].second->id == he22->paired_edge->id
               )
             {
                 candidates[i].second = NULL;
@@ -392,9 +475,15 @@ public:
 
         face1->heEdge = NULL;
         face2->heEdge = NULL;
+        heFaces.erase(face1->id);
+        heFaces.erase(face2->id);
+        //printf("erase face 1: %d\n", heFaces.erase(face1->id));
+        //printf("erase face 2: %d\n", heFaces.erase(face2->id));
 
-        printf("%d", vertices.erase(u));
-        printf("%d",  vertices.erase(v));
+        vertices.erase(u);
+        vertices.erase(v);
+        //printf("erase vertices u: %d\n", vertices.erase(u));
+        //printf("erase vertices v: %d\n",  vertices.erase(v));
     }
 };
 
